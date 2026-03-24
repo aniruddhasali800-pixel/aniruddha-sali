@@ -4,24 +4,19 @@ const multer = require('multer');
 const path = require('path');
 const Content = require('../models/Content');
 const User = require('../models/User');
-const { GridFsStorage } = require('multer-gridfs-storage');
-
-const storage = new GridFsStorage({
-    url: process.env.MONGODB_URI,
-    file: (req, file) => {
-        return new Promise((resolve) => {
-            const filename = Date.now() + '-' + file.originalname.replace(/\s+/g, '_');
-            const fileInfo = {
-                filename: filename,
-                bucketName: 'uploads'
-            };
-            resolve(fileInfo);
-        });
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        const type = req.body.type === 'pdf' ? 'all data storage' : 'project data storage';
+        cb(null, `data/${type}`);
+    },
+    filename: (req, file, cb) => {
+        cb(null, Date.now() + '-' + file.originalname.replace(/\s+/g, '_'));
     }
 });
 
 const upload = multer({ 
     storage,
+    limits: { fileSize: 5 * 1024 * 1024 * 1024, files: 1 }, // 5GB Limit
     fileFilter: (req, file, cb) => {
         const filetypes = /pdf|zip|javascript|json|text/;
         const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
@@ -64,7 +59,7 @@ router.post('/publish', upload.single('file'), async (req, res) => {
             description,
             type,
             category,
-            fileUrl: `/api/contents/file/${req.file.filename}`,
+            fileUrl: `/data/${type === 'pdf' ? 'all%20data%20storage' : 'project%20data%20storage'}/${req.file.filename}`,
             size: size || (req.file.size ? (req.file.size / (1024 * 1024)).toFixed(2) + ' MB' : 'Unknown'),
             language,
             isFree: isFree === 'true' || isFree === true,

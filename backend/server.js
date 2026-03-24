@@ -18,7 +18,11 @@ const { ensureDirs } = require('./utils/storage');
 ensureDirs();
 
 // Middleware
-app.use(cors());
+app.use(cors({
+    origin: true,
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
+}));
 app.use(express.json());
 app.use(express.static('public')); // For older file uploads
 app.use('/data', express.static('data')); // For new data storage
@@ -34,13 +38,6 @@ app.use(passport.session());
 mongoose.connect(process.env.MONGODB_URI)
     .then(() => console.log('Connected to MongoDB'))
     .catch(err => console.error('Could not connect to MongoDB', err));
-
-let gridfsBucket;
-mongoose.connection.once('open', () => {
-    gridfsBucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, {
-        bucketName: 'uploads'
-    });
-});
 
 // Passport Google Auth Strategy
 passport.use(new GoogleStrategy({
@@ -86,19 +83,6 @@ app.get('/auth/google/callback',
         // Successful authentication
         res.redirect('http://localhost:5000/?token=' + req.user.id);
     });
-
-// API route to stream files from GridFS
-app.get('/api/contents/file/:filename', async (req, res) => {
-    try {
-        const files = await gridfsBucket.find({ filename: req.params.filename }).toArray();
-        if (!files || files.length === 0) {
-            return res.status(404).json({ err: 'No file exists' });
-        }
-        gridfsBucket.openDownloadStreamByName(req.params.filename).pipe(res);
-    } catch (err) {
-        res.status(500).json({ err: err.message });
-    }
-});
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
